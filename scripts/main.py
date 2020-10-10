@@ -3,7 +3,7 @@ from pygame.locals import *
 import rect_animation
 
 surf_x_size = 600
-surf_y_size = 1000
+surf_y_size = 800
 num_inputs = 9 # Xbox 360 controller : direction, a,b,x,y,lt,rt,lb,rb
 
 left_offset = 10
@@ -12,9 +12,10 @@ top_offset = 10
 rect_width = (surf_x_size - left_offset) // num_inputs
 rect_height = 20
 
-colors = [(255, 255, 255), (255, 0, 0), (255, 165, 0), (255, 255, 0), (128, 255, 0), (0, 128, 0), (0, 0, 255), (75, 0, 130), (238, 130, 238)]
+colors = [(128, 128, 128), (255, 0, 0), (255, 165, 0), (255, 255, 0), (128, 255, 0), (0, 128, 0), (0, 0, 255), (75, 0, 130), (238, 130, 238)]
 lefts = [x for x in range(left_offset, surf_x_size-rect_width, rect_width)]
 tops = [top_offset]*num_inputs
+held = {0: False} # use to track button state and create a single rect of a height dependent on frames a button was held
 
 def addNote(input_type, curr_colors, curr_lefts, curr_tops, curr_rects):
     inputs = {"Dir": 0, "X": 1, "A": 2, "Y": 3, "B": 4, "RB": 5, "RT": 6, "LB": 7, "LT": 8}
@@ -22,6 +23,13 @@ def addNote(input_type, curr_colors, curr_lefts, curr_tops, curr_rects):
     curr_lefts.append(lefts[inputs[input_type]])
     curr_tops.append(tops[inputs[input_type]])
     curr_rects.append(rect_animation.getRect(curr_lefts[-1], curr_tops[-1], rect_width, rect_height))
+
+def clearNote(num_to_pop, curr_colors, curr_lefts, curr_tops, curr_rects):
+    for i in range(num_to_pop):
+        curr_colors.pop(0)
+        curr_lefts.pop(0)
+        curr_tops.pop(0)
+        curr_rects.pop(0)
 
 
 
@@ -131,6 +139,7 @@ curr_rects = []
 
 while run: # often used for main game loop: handle events, update game state, draw state to screen
     iteration += 1
+    rectsLeavingThisFrame = 0
 
     for event in pygame.event.get():
          
@@ -239,9 +248,19 @@ while run: # often used for main game loop: handle events, update game state, dr
     for j in range(len(curr_rects)):
         curr_rects[j] = curr_rects[j].move(vx*dt, vy*dt)
         pygame.draw.rect(screen, curr_colors[j], curr_rects[j])
+        if curr_rects[j].bottom > surf_y_size:
+            rectsLeavingThisFrame += 1
+
+    clearNote(rectsLeavingThisFrame, curr_colors, curr_lefts, curr_tops, curr_rects)
+
+    textPrint.print(screen, "Rects in memory: {}".format(str(len(curr_rects))))
 
     display_fps()
     pygame.draw.rect(screen, (255,0,255,255), r)
+
+    # draw judgment line 
+    judgmentLineDistFromBottom = 100
+    pygame.draw.line(screen, (255, 255, 255), (0, surf_y_size-judgmentLineDistFromBottom), (surf_x_size, surf_y_size-judgmentLineDistFromBottom))
 
     pygame.display.update()
     #pygame.display.flip()
