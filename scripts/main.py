@@ -1,7 +1,14 @@
 import pygame
 from pygame.locals import *
-import rect_animation
+import notes
+from textprint import TextPrint
+from init_and_fps import *
+import overlay
+from math import floor 
 
+"""
+Constants
+"""
 surf_x_size = 600
 surf_y_size = 800
 num_inputs = 9 # Xbox 360 controller : direction, a,b,x,y,lt,rt,lb,rb
@@ -15,104 +22,27 @@ rect_height = 20
 colors = [(128, 128, 128), (255, 0, 0), (255, 165, 0), (255, 255, 0), (128, 255, 0), (0, 128, 0), (0, 0, 255), (75, 0, 130), (238, 130, 238)]
 lefts = [x for x in range(left_offset, surf_x_size-rect_width, rect_width)]
 tops = [top_offset]*num_inputs
-held = {0: False} # use to track button state and create a single rect of a height dependent on frames a button was held
+notes.initNotes(colors, lefts, tops, rect_width, rect_height)
+curr_colors = []
+curr_lefts = []
+curr_tops = [] 
+curr_rects = []
 
-def addNote(input_type, curr_colors, curr_lefts, curr_tops, curr_rects):
-    inputs = {"Dir": 0, "X": 1, "A": 2, "Y": 3, "B": 4, "RB": 5, "RT": 6, "LB": 7, "LT": 8}
-    curr_colors.append(colors[inputs[input_type]])
-    curr_lefts.append(lefts[inputs[input_type]])
-    curr_tops.append(tops[inputs[input_type]])
-    curr_rects.append(rect_animation.getRect(curr_lefts[-1], curr_tops[-1], rect_width, rect_height))
+xb_button_map = {0: "A", 1: "B", 2: "X", 3: "Y", 4: "LB", 5: "RB", 6: "Back", 7: "Start", 8: "L3", 9: "R3"}
+xb_valid_button_nums = set([0, 1, 2, 3, 4, 5])
+xb_axis_map = {-0.996: "RT", 0.996: "LT"}
+xb_dir_map = {(0, 0): 5, (1, 0): 6, (0, -1): 2, (-1, 0): 4, (0, 1): 8, (1, -1): 3, (-1, -1): 1, (-1, 1): 7, (1, 1): 9}
+xb_held_axes = {"LT": False, "RT": False}
+# LT+RT not supported; this gives same reading as no triggers pressed
 
-def clearNote(num_to_pop, curr_colors, curr_lefts, curr_tops, curr_rects):
-    for i in range(num_to_pop):
-        curr_colors.pop(0)
-        curr_lefts.pop(0)
-        curr_tops.pop(0)
-        curr_rects.pop(0)
-
-
-
-class TextPrint(object):
-    """
-    This is a simple class that will help us print to the screen
-    It has nothing to do with the joysticks, just outputting the
-    information.
-    """
-    def __init__(self, x_pos=10, y_pos=10):
-        """ Constructor """
-        self.x_pos = x_pos
-        self.y_pos = y_pos
-        self.x_reset_pos = self.x_pos 
-        self.y_reset_pos = self.y_pos
-        self.reset()
-        self.font = pygame.font.SysFont("Arial", 20)
- 
-    def print(self, my_screen, text_string):
-        """ Draw text onto the screen. """
-        text_bitmap = self.font.render(text_string, True, (255,255,255))
-        my_screen.blit(text_bitmap, [self.x_pos, self.y_pos])
-        self.y_pos += self.line_height
- 
-    def reset(self):
-        """ Reset text to the top of the screen. """
-        self.x_pos = self.x_reset_pos
-        self.y_pos = self.y_reset_pos
-        self.line_height = 15
- 
-    def indent(self):
-        """ Indent the next line of text """
-        self.x_pos += 10
- 
-    def unindent(self):
-        """ Unindent the next line of text """
-        self.x_pos -= 10
-
-def init_screen_and_clock(surf_x_size, surf_y_size):
-    global screen, display, clock
-    pygame.init()
-    WINDOW_SIZE = (surf_x_size, surf_y_size)
-    pygame.display.set_caption('CRT v0.1')
-    screen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)
-    clock = pygame.time.Clock()
-
-def create_fonts(font_sizes_list):
-    #"Creates different fonts with one list"
-    fonts = []
-    for size in font_sizes_list:
-        fonts.append(
-            pygame.font.SysFont("Arial", size))
-    return fonts
- 
- 
-def render(fnt, what, color, where):
-    #"Renders the fonts as passed from display_fps"
-    text_to_show = fnt.render(what, 0, pygame.Color(color))
-    screen.blit(text_to_show, where)
- 
- 
-def display_fps():
-    #"Data that will be rendered and blitted in _display"
-    render(
-        fonts[0],
-        what=str(int(round(clock.get_fps()))) + " fps",
-        color="white",
-        where=(0, 0))
-
-
-
-init_screen_and_clock(surf_x_size, surf_y_size)
+app_name = "CRT v0.1"
+screen, clock = init_screen_and_clock(surf_x_size, surf_y_size, app_name)
 fonts = create_fonts([32, 16, 14, 8])
-
-#DISPLAYSURF = pygame.display.set_mode((surf_x_size, surf_y_size)) 
-# returns pygame.Surface object for the window and sets window size in pixels
-
 fps = 60
 
 i = 1
-r = rect_animation.getRect(i, i, 20, 20)
+r = notes.getRect(i, i, 20, 20)
 
-#clock = pygame.time.Clock()
 dt = clock.tick(fps)
 vx = 0.0
 vy = 0.08
@@ -121,26 +51,51 @@ run = True
 # Joystick
 pygame.joystick.init()
 
-# Get ready to print text 
+# Get ready to print text and initialize start position
 textPrint = TextPrint(x_pos=10, y_pos=50)
 
-iteration = 0
+buttonPressed = False 
+buttonReleased = False
 
-debug = False 
+debug = False
 
-xb_button_map = {0: "A", 1: "B", 2: "X", 3: "Y", 4: "LB", 5: "RB", 6: "Back", 7: "Start", 8: "L3", 9: "R3"}
-xb_axis_map = {-0.996: "RT", 0.996: "LT"}
-xb_dir_map = {'(0, 0)': 5, '(1, 0)': 6, '(0, -1)': 2, '(-1, 0)': 4, '(0, 1)': 8, '(1, -1)': 3, '(-1, -1)': 1, '(-1, 1)': 7, '(1, 1)': 9}
+# Overlay (x360, fightstick). Base dimensions are 539x262
+overlay_base, overlay_btn, overlay_balltop = overlay.initOverlay(300, 300, screen)
+overlay_rotate_deg = 0.0
+overlay_scale_factor = 0.5
+overlay_base = pygame.transform.rotozoom(overlay_base, overlay_rotate_deg, overlay_scale_factor)
+overlay_btn = pygame.transform.rotozoom(overlay_btn, overlay_rotate_deg, overlay_scale_factor)
+overlay_balltop = pygame.transform.rotozoom(overlay_balltop, overlay_rotate_deg, overlay_scale_factor)
+overlay_map = {
+    0: [176, 175],      # A
+    1: [256, 145],      # B
+    2: [193, 87],       # X
+    3: [271, 52],       # Y
+    4: [445, 52],       # LB
+    5: [359, 52],       # RB
+    0.996: [428, 146],  # LT
+    -0.996: [342, 145], # RT
+    (0,0): [35, 109],   # neutral
+    (0,1): [35, 84],    # up
+    (0,-1): [35, 134],  # down 
+    (1,0): [63, 109],   # forward 
+    (-1,0): [7, 109],   # back
+    (1,1): [63, 84],   # up forward
+    (-1,-1): [7, 134],   # down back
+    (-1,1): [7, 84],   # up back 
+    (1,-1): [63, 134]    # down forward
+}
+for key, val in overlay_map.items():
+    overlay_map[key] = (val[0]*overlay_scale_factor, val[1]*overlay_scale_factor)
+print(overlay_map)
+overlay_x = 300
+overlay_y = 50
 
-curr_colors = []
-curr_lefts = []
-curr_tops = [] 
-curr_rects = []
 
-while run: # often used for main game loop: handle events, update game state, draw state to screen
-    iteration += 1
+
+while run:
     rectsLeavingThisFrame = 0
-
+    #how to get release or display stick
     for event in pygame.event.get():
          
         if event.type == QUIT: 
@@ -148,14 +103,36 @@ while run: # often used for main game loop: handle events, update game state, dr
 
         if debug:
             if event.type == pygame.JOYBUTTONDOWN:
-                print("Joystick button pressed.")
-                print(iteration)
-            if event.type == pygame.JOYBUTTONUP:
-                print("Joystick button released.")
-                print(iteration)
+                print("Joystick button pressed:", event.button)
+                # 'press' appropriate button
+                buttonPressed = True
+            elif event.type == pygame.JOYBUTTONUP:
+                print("Joystick button released:", event.button)
+                # 'release' appropriate button and create rect
+                buttonReleased = True
+            elif event.type == pygame.JOYAXISMOTION:
+                #print(event.dict, event.joy, event.axis, event.value)
+                axisValue = round(event.value, 3)
+                if event.axis == 2 and axisValue == -0.996:
+                    print("Joystick button pressed: RT")
+                    xb_held_axes["RT"] = True
+                elif event.axis == 2 and axisValue == 0.0 and xb_held_axes["RT"]:
+                    print("Joystick button released: RT")
+                    xb_held_axes["RT"] = False
+                if event.axis == 2 and axisValue == 0.996:
+                    print("Joystick button pressed: LT")
+                    xb_held_axes["LT"] = True 
+                elif event.axis == 2 and axisValue == 0.0 and xb_held_axes["LT"]:
+                    print("Joystick button released: LT")
+                    xb_held_axes["LT"] = False 
+
+            elif event.type == pygame.JOYHATMOTION:
+                print("Direction ", xb_dir_map[event.value])
     
     textPrint.reset()
     screen.fill((0, 0, 0)) # put before drawing
+
+    screen.blit(overlay_base, [overlay_x, overlay_y])
 
     if debug: 
         # Get count of joysticks
@@ -205,12 +182,12 @@ while run: # often used for main game loop: handle events, update game state, dr
     
             for i in range(hats):
                 hat = joystick.get_hat(i)
-                textPrint.print(screen, "Hat {} value: {}".format(i, str(hat)))
+                textPrint.print(screen, "Hat {} value: {}".format(i, hat))
             textPrint.unindent()
     
             textPrint.unindent()
 
-    # Have only 1 plugged in when starting
+    # Have only 1 plugged in when starting, TODO make a class and put this into a library, call all these checks
     """ Begin Xbox 360 """
     joystick = pygame.joystick.Joystick(0)
     joystick.init()
@@ -222,28 +199,31 @@ while run: # often used for main game loop: handle events, update game state, dr
     buttons = joystick.get_numbuttons()
     for button_num in xb_button_map:
         button = joystick.get_button(button_num)
-        if button:
+        if button and button_num in xb_valid_button_nums:
             textPrint.print(screen, "{}".format(xb_button_map[button_num]))
-            addNote(xb_button_map[button_num], curr_colors, curr_lefts, curr_tops, curr_rects)
+            notes.addNote(xb_button_map[button_num], curr_colors, curr_lefts, curr_tops, curr_rects)
+            screen.blit(overlay_btn, [overlay_x+overlay_map[button_num][0], overlay_y+overlay_map[button_num][1]])
+
 
     # TODO: for xbox 360, need to handle button state to be able to handle LT+RT
     axis = round(axis, 3)
-    if axis == 0.996 or axis == -0.996:
+    if (axis == 0.996 or axis == -0.996):
         textPrint.print(screen, "{}".format(xb_axis_map[axis]))
-        addNote(xb_axis_map[axis], curr_colors, curr_lefts, curr_tops, curr_rects)
+        notes.addNote(xb_axis_map[axis], curr_colors, curr_lefts, curr_tops, curr_rects)
+        screen.blit(overlay_btn, [overlay_x+overlay_map[axis][0], overlay_y+overlay_map[axis][1]])
         
     hat = joystick.get_hat(0)
-    textPrint.print(screen, "{}".format(xb_dir_map[str(hat)]))
-    if xb_dir_map[str(hat)] != 5:
-        addNote("Dir", curr_colors, curr_lefts, curr_tops, curr_rects)
+    textPrint.print(screen, "{}".format(xb_dir_map[hat]))
+    if xb_dir_map[hat] != 5:
+        notes.addNote("Dir", curr_colors, curr_lefts, curr_tops, curr_rects)
+        screen.blit(overlay_balltop, [overlay_x+overlay_map[hat][0], overlay_y+overlay_map[hat][1]])
 
 
      
     """ End Xbox 360 """
 
-    #r1 = r
+    # Hello world/animation test rectangle, for debugging
     r = r.move(vx*dt, vy*dt)
-    #print(r1, ' to ', r)
 
     for j in range(len(curr_rects)):
         curr_rects[j] = curr_rects[j].move(vx*dt, vy*dt)
@@ -251,22 +231,24 @@ while run: # often used for main game loop: handle events, update game state, dr
         if curr_rects[j].bottom > surf_y_size:
             rectsLeavingThisFrame += 1
 
-    clearNote(rectsLeavingThisFrame, curr_colors, curr_lefts, curr_tops, curr_rects)
+    notes.clearNote(rectsLeavingThisFrame, curr_colors, curr_lefts, curr_tops, curr_rects)
 
     textPrint.print(screen, "Rects in memory: {}".format(str(len(curr_rects))))
 
-    display_fps()
+    display_fps(fonts)
     pygame.draw.rect(screen, (255,0,255,255), r)
 
-    # draw judgment line 
+    # draw judgment line , TODO put into library later
     judgmentLineDistFromBottom = 100
     pygame.draw.line(screen, (255, 255, 255), (0, surf_y_size-judgmentLineDistFromBottom), (surf_x_size, surf_y_size-judgmentLineDistFromBottom))
 
     pygame.display.update()
-    #pygame.display.flip()
     clock.tick(fps)
 
-    # terminate when 1 rect leaves screen
+    buttonPressed = False 
+    buttonReleased = False
+
+    # terminate when 1 rect leaves screen, for debugging
     """
     if r.left > surf_x_size or r.top > surf_y_size:
         run = False 
