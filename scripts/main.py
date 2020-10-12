@@ -33,7 +33,19 @@ xb_valid_button_nums = set([0, 1, 2, 3, 4, 5])
 xb_axis_map = {-0.996: "RT", 0.996: "LT"}
 xb_dir_map = {(0, 0): 5, (1, 0): 6, (0, -1): 2, (-1, 0): 4, (0, 1): 8, (1, -1): 3, (-1, -1): 1, (-1, 1): 7, (1, 1): 9}
 xb_held_axes = {"LT": False, "RT": False}
+xb_axis_released = ""
 # LT+RT not supported; this gives same reading as no triggers pressed
+xb_held_buttons = {}
+for val in xb_button_map.values():
+    xb_held_buttons[val] = -1
+for val in xb_axis_map.values():
+    xb_held_buttons[val] = -1
+
+xb_held_buttons_frames = {}
+for val in xb_button_map.values():
+    xb_held_buttons_frames[val] = 0
+for val in xb_axis_map.values():
+    xb_held_buttons_frames[val] = 0
 
 app_name = "CRT v0.1"
 screen, clock = init_screen_and_clock(surf_x_size, surf_y_size, app_name)
@@ -56,6 +68,8 @@ textPrint = TextPrint(x_pos=10, y_pos=50)
 
 buttonPressed = False 
 buttonReleased = False
+
+prevDir = 5 # last direction the stick was pushed
 
 debug = False
 
@@ -87,7 +101,6 @@ overlay_map = {
 }
 for key, val in overlay_map.items():
     overlay_map[key] = (val[0]*overlay_scale_factor, val[1]*overlay_scale_factor)
-print(overlay_map)
 overlay_x = 300
 overlay_y = 50
 
@@ -101,33 +114,40 @@ while run:
         if event.type == QUIT: 
             run = False
 
-        if debug:
-            if event.type == pygame.JOYBUTTONDOWN:
-                print("Joystick button pressed:", event.button)
-                # 'press' appropriate button
-                buttonPressed = True
-            elif event.type == pygame.JOYBUTTONUP:
-                print("Joystick button released:", event.button)
-                # 'release' appropriate button and create rect
-                buttonReleased = True
-            elif event.type == pygame.JOYAXISMOTION:
-                #print(event.dict, event.joy, event.axis, event.value)
-                axisValue = round(event.value, 3)
-                if event.axis == 2 and axisValue == -0.996:
-                    print("Joystick button pressed: RT")
-                    xb_held_axes["RT"] = True
-                elif event.axis == 2 and axisValue == 0.0 and xb_held_axes["RT"]:
-                    print("Joystick button released: RT")
-                    xb_held_axes["RT"] = False
-                if event.axis == 2 and axisValue == 0.996:
-                    print("Joystick button pressed: LT")
-                    xb_held_axes["LT"] = True 
-                elif event.axis == 2 and axisValue == 0.0 and xb_held_axes["LT"]:
-                    print("Joystick button released: LT")
-                    xb_held_axes["LT"] = False 
+        if event.type == pygame.JOYBUTTONDOWN:
+            print("Joystick button pressed:", event.button)
+            xb_held_buttons[xb_button_map[event.button]] = 0
 
-            elif event.type == pygame.JOYHATMOTION:
-                print("Direction ", xb_dir_map[event.value])
+        elif event.type == pygame.JOYBUTTONUP:
+            print("Joystick button released:", event.button)
+            xb_held_buttons_frames[xb_button_map[event.button]] = xb_held_buttons[xb_button_map[event.button]]
+            xb_held_buttons[xb_button_map[event.button]] = -1
+
+        elif event.type == pygame.JOYAXISMOTION:
+            axisValue = round(event.value, 3)
+            if event.axis == 2 and axisValue == -0.996:
+                print("Joystick button pressed: RT")
+                xb_held_axes["RT"] = True
+                xb_held_buttons[xb_axis_map[axisValue]] = 0
+            elif event.axis == 2 and axisValue == 0.0 and xb_held_axes["RT"]:
+                print("Joystick button released: RT")
+                xb_held_axes["RT"] = False
+                xb_axis_released = "RT"
+                xb_held_buttons_frames[xb_axis_released] = xb_held_buttons[xb_axis_map[-0.996]]
+                xb_held_buttons[xb_axis_map[-0.996]] = -1
+            if event.axis == 2 and axisValue == 0.996:
+                print("Joystick button pressed: LT")
+                xb_held_axes["LT"] = True 
+                xb_held_buttons[xb_axis_map[axisValue]] = 0
+            elif event.axis == 2 and axisValue == 0.0 and xb_held_axes["LT"]:
+                print("Joystick button released: LT")
+                xb_held_axes["LT"] = False 
+                xb_axis_released = "LT"
+                xb_held_buttons_frames[xb_axis_released] = xb_held_buttons[xb_axis_map[0.996]]
+                xb_held_buttons[xb_axis_map[0.996]] = -1
+
+        elif event.type == pygame.JOYHATMOTION:
+            print("Direction ", xb_dir_map[event.value])
     
     textPrint.reset()
     screen.fill((0, 0, 0)) # put before drawing
@@ -201,22 +221,36 @@ while run:
         button = joystick.get_button(button_num)
         if button and button_num in xb_valid_button_nums:
             textPrint.print(screen, "{}".format(xb_button_map[button_num]))
-            notes.addNote(xb_button_map[button_num], curr_colors, curr_lefts, curr_tops, curr_rects)
             screen.blit(overlay_btn, [overlay_x+overlay_map[button_num][0], overlay_y+overlay_map[button_num][1]])
+            xb_held_buttons[xb_button_map[button_num]] += 1
+            print(xb_held_buttons[xb_button_map[button_num]], xb_button_map[button_num])
+        if not button and xb_held_buttons_frames[xb_button_map[button_num]]:
+            notes.addNote(xb_button_map[button_num], curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=xb_held_buttons_frames[xb_button_map[button_num]])
+            xb_held_buttons_frames[xb_button_map[button_num]] = 0
 
 
-    # TODO: for xbox 360, need to handle button state to be able to handle LT+RT
     axis = round(axis, 3)
-    if (axis == 0.996 or axis == -0.996):
+
+    if axis == 0.996:
         textPrint.print(screen, "{}".format(xb_axis_map[axis]))
-        notes.addNote(xb_axis_map[axis], curr_colors, curr_lefts, curr_tops, curr_rects)
         screen.blit(overlay_btn, [overlay_x+overlay_map[axis][0], overlay_y+overlay_map[axis][1]])
-        
+        xb_held_buttons[xb_axis_map[axis]] += 1
+        print(xb_held_buttons[xb_axis_map[axis]], xb_axis_map[axis])
+    elif axis == -0.996:
+        textPrint.print(screen, "{}".format(xb_axis_map[axis]))
+        screen.blit(overlay_btn, [overlay_x+overlay_map[axis][0], overlay_y+overlay_map[axis][1]])
+        xb_held_buttons[xb_axis_map[axis]] += 1
+        print(xb_held_buttons[xb_axis_map[axis]], xb_axis_map[axis])        
+    elif axis in (0.0, -0.0) and xb_axis_released:
+        notes.addNote(xb_axis_released, curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=xb_held_buttons_frames[xb_axis_released])
+        xb_axis_released = ""
+
     hat = joystick.get_hat(0)
     textPrint.print(screen, "{}".format(xb_dir_map[hat]))
-    if xb_dir_map[hat] != 5:
-        notes.addNote("Dir", curr_colors, curr_lefts, curr_tops, curr_rects)
-        screen.blit(overlay_balltop, [overlay_x+overlay_map[hat][0], overlay_y+overlay_map[hat][1]])
+    if xb_dir_map[hat] != 5 and xb_dir_map[hat] != prevDir:
+        notes.addNote("Dir", curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=2)
+    screen.blit(overlay_balltop, [overlay_x+overlay_map[hat][0], overlay_y+overlay_map[hat][1]])
+    prevDir = xb_dir_map[hat]
 
 
      
