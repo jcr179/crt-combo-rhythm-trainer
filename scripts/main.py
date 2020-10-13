@@ -13,6 +13,7 @@ Constants
 surf_x_size = 600
 surf_y_size = 800
 num_inputs = 9 # Xbox 360 controller : direction, a,b,x,y,lt,rt,lb,rb
+pygame.mixer.pre_init(44100, 16, num_inputs, 4096)
 
 left_offset = 10
 top_offset = 10
@@ -122,8 +123,15 @@ arrows = {1: pygame.transform.rotozoom(pygame.image.load(os.path.join(arrow_dir,
           9: pygame.transform.rotozoom(pygame.image.load(os.path.join(arrow_dir, "arrow_upfwd.png")), 0.0, arrow_scale_factor)
 }
 
+# sound effects sfx 
 
+sound_dir = os.path.join(os.getcwd(), "resources", "sfx")
+sfx_tap = pygame.mixer.Sound(os.path.join(sound_dir, "soft-hitnormal.ogg"))
+#sfx_release = pygame.mixer.Sound(os.path.join(sound_dir, "soft-hitfinish.wav"))
+sfx_played = []
 
+# judgment line
+judgmentLineDistFromBottom = 100
 
 
 prevDir = 5 # direction stick pointed last in numpad notation
@@ -253,8 +261,10 @@ while run:
         if not button and xb_held_buttons_frames[xb_button_map[button_num]]:
             if xb_held_buttons_frames[xb_button_map[button_num]] > tap_window:
                 notes.addNote(xb_button_map[button_num], curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=xb_held_buttons_frames[xb_button_map[button_num]] * (vy/0.1))
+                sfx_played.append(False)
             else:
                 notes.addNote(xb_button_map[button_num], curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=rect_height)
+                sfx_played.append(False)
             xb_held_buttons_frames[xb_button_map[button_num]] = 0
 
 
@@ -273,8 +283,10 @@ while run:
     elif axis in (0.0, -0.0) and xb_axis_released:
         if xb_held_buttons_frames[xb_axis_released] > tap_window:
             notes.addNote(xb_axis_released, curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=xb_held_buttons_frames[xb_axis_released] * (vy/0.1))
+            sfx_played.append(False)
         else:
             notes.addNote(xb_axis_released, curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=rect_height)
+            sfx_played.append(False)
         xb_axis_released = ""
 
     hat = joystick.get_hat(0)
@@ -282,6 +294,7 @@ while run:
     # TODO fix for hold directions ; charge moves
     if xb_dir_map[hat] != 5 and xb_dir_map[hat] != prevDir:
         notes.addNote("Dir", curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=rect_height, direction=xb_dir_map[hat])
+        sfx_played.append(False)
     screen.blit(overlay_balltop, [overlay_x+overlay_map[hat][0], overlay_y+overlay_map[hat][1]])
     prevDir = xb_dir_map[hat]
 
@@ -296,6 +309,10 @@ while run:
             pygame.draw.rect(screen, curr_colors[j], curr_rects[j])
             if curr_rects[j].top > surf_y_size:
                 rectsLeavingThisFrame += 1
+            
+            if curr_rects[j].bottom  >= surf_y_size-judgmentLineDistFromBottom and not sfx_played[j]:
+                sfx_tap.play()
+                sfx_played[j] = True
 
         else: # is image
             curr_colors[j][0] += int(vx*dt)
@@ -304,17 +321,23 @@ while run:
             if curr_colors[j][1] > surf_y_size:
                 rectsLeavingThisFrame += 1
 
+            if curr_colors[j][1]  >= surf_y_size-judgmentLineDistFromBottom and not sfx_played[j]:
+                sfx_tap.play()
+                sfx_played[j] = True
+
         
 
     notes.clearNote(rectsLeavingThisFrame, curr_colors, curr_lefts, curr_tops, curr_rects)
+    for _ in range(rectsLeavingThisFrame):
+        sfx_played.pop(0)
 
     textPrint.print(screen, "Rects in memory: {}".format(str(len(curr_rects))))
 
     display_fps(fonts)
 
     # draw judgment line , TODO put into library later
-    judgmentLineDistFromBottom = 100
-    pygame.draw.line(screen, (255, 255, 255), (0, surf_y_size-judgmentLineDistFromBottom), (surf_x_size, surf_y_size-judgmentLineDistFromBottom), 3)
+    #pygame.draw.line(screen, (255, 255, 255), (0, surf_y_size-judgmentLineDistFromBottom), (surf_x_size, surf_y_size-judgmentLineDistFromBottom), 3)
+    pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(0, surf_y_size-judgmentLineDistFromBottom, surf_x_size, 5))
 
     pygame.display.update()
     clock.tick(fps)
