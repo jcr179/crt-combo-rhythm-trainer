@@ -13,7 +13,8 @@ Constants
 surf_x_size = 600
 surf_y_size = 800
 num_inputs = 9 # Xbox 360 controller : direction, a,b,x,y,lt,rt,lb,rb
-pygame.mixer.pre_init(44100, 16, num_inputs, 4096)
+pygame.mixer.init()
+pygame.mixer.set_num_channels(num_inputs)
 
 left_offset = 10
 top_offset = 10
@@ -125,8 +126,11 @@ arrows = {1: pygame.transform.rotozoom(pygame.image.load(os.path.join(arrow_dir,
 
 # sound effects sfx 
 
+num_channels = pygame.mixer.get_num_channels()
+pygame.mixer.Channel(0).set_volume(0.2)
+channels = [pygame.mixer.Channel(x) for x in range(num_channels)]
 sound_dir = os.path.join(os.getcwd(), "resources", "sfx")
-sfx_tap = pygame.mixer.Sound(os.path.join(sound_dir, "soft-hitnormal.ogg"))
+sfx_tap = pygame.mixer.Sound(os.path.join(sound_dir, "soft-hitnormal-short.ogg"))
 #sfx_release = pygame.mixer.Sound(os.path.join(sound_dir, "soft-hitfinish.wav"))
 sfx_played = []
 
@@ -262,9 +266,20 @@ while run:
             if xb_held_buttons_frames[xb_button_map[button_num]] > tap_window:
                 notes.addNote(xb_button_map[button_num], curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=xb_held_buttons_frames[xb_button_map[button_num]] * (vy/0.1))
                 sfx_played.append(False)
+
+                available_ch = pygame.mixer.find_channel()
+                if available_ch is not None:
+                    print(available_ch)
+                    available_ch.play(sfx_tap)
+                
             else:
                 notes.addNote(xb_button_map[button_num], curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=rect_height)
                 sfx_played.append(False)
+
+                available_ch = pygame.mixer.find_channel()
+                if available_ch is not None:
+                    print(available_ch)
+                    available_ch.play(sfx_tap)
             xb_held_buttons_frames[xb_button_map[button_num]] = 0
 
 
@@ -284,9 +299,19 @@ while run:
         if xb_held_buttons_frames[xb_axis_released] > tap_window:
             notes.addNote(xb_axis_released, curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=xb_held_buttons_frames[xb_axis_released] * (vy/0.1))
             sfx_played.append(False)
+
+            available_ch = pygame.mixer.find_channel()
+            if available_ch is not None:
+                print(available_ch)
+                available_ch.play(sfx_tap)
         else:
             notes.addNote(xb_axis_released, curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=rect_height)
             sfx_played.append(False)
+
+            available_ch = pygame.mixer.find_channel()
+            if available_ch is not None:
+                print(available_ch)
+                available_ch.play(sfx_tap)
         xb_axis_released = ""
 
     hat = joystick.get_hat(0)
@@ -295,13 +320,21 @@ while run:
     if xb_dir_map[hat] != 5 and xb_dir_map[hat] != prevDir:
         notes.addNote("Dir", curr_colors, curr_lefts, curr_tops, curr_rects, rect_w=rect_width, rect_h=rect_height, direction=xb_dir_map[hat])
         sfx_played.append(False)
+
+        available_ch = pygame.mixer.find_channel()
+        if available_ch is not None:
+            print(available_ch)
+            available_ch.play(sfx_tap)
     screen.blit(overlay_balltop, [overlay_x+overlay_map[hat][0], overlay_y+overlay_map[hat][1]])
     prevDir = xb_dir_map[hat]
 
      
     """ End Xbox 360 """
 
+    channels_to_play = [False]*num_inputs
+    sfx_plays = 0
 
+    print(len(curr_rects))
     for j in range(len(curr_rects)):
         if isinstance(curr_rects[j], pygame.Rect):
             curr_rects[j].left += int(vx*dt)
@@ -310,9 +343,20 @@ while run:
             if curr_rects[j].top > surf_y_size:
                 rectsLeavingThisFrame += 1
             
-            if curr_rects[j].bottom  >= surf_y_size-judgmentLineDistFromBottom and not sfx_played[j]:
-                sfx_tap.play()
+            if curr_rects[j].bottom  >= surf_y_size-judgmentLineDistFromBottom and j + 1 < len(sfx_played) and not sfx_played[j]:
+                channels_to_play[lefts.index(curr_rects[j].left)] = True
+                print('(btn) channel ', lefts.index(curr_rects[j].left))
+                #channels[j % num_channels].play(sfx_tap)
+                """
+                available_ch = pygame.mixer.find_channel()
+                if available_ch is not None:
+                    print(available_ch)
+                    available_ch.play(sfx_tap)
+                """
+                channels_to_play[j] = True
+                
                 sfx_played[j] = True
+                sfx_plays += 1
 
         else: # is image
             curr_colors[j][0] += int(vx*dt)
@@ -321,14 +365,33 @@ while run:
             if curr_colors[j][1] > surf_y_size:
                 rectsLeavingThisFrame += 1
 
-            if curr_colors[j][1]  >= surf_y_size-judgmentLineDistFromBottom and not sfx_played[j]:
-                sfx_tap.play()
+            if curr_colors[j][1]  >= surf_y_size-judgmentLineDistFromBottom and j +1 < len(sfx_played) and not sfx_played[j]:
+                channels_to_play[lefts.index(curr_colors[j][0])] = True
+                print('(dir) channel ', lefts.index(curr_colors[j][0]))
+                #channels[j % num_channels].play(sfx_tap)
+                """
+                available_ch = pygame.mixer.find_channel()
+                if available_ch is not None:
+                    print(available_ch)
+                    available_ch.play(sfx_tap)
+                """
+                channels_to_play[j] = True
+
+                
                 sfx_played[j] = True
+                sfx_plays += 1
 
-        
 
+        if any(channels_to_play):
+            print(channels_to_play)
+        for k in range(len(channels_to_play)):
+            if channels_to_play[k]:
+                print('channel ', k)
+                channels[k % num_channels].play(sfx_tap)
+
+    #print(sfx_played)
     notes.clearNote(rectsLeavingThisFrame, curr_colors, curr_lefts, curr_tops, curr_rects)
-    for _ in range(rectsLeavingThisFrame):
+    for _ in range(sfx_plays):
         sfx_played.pop(0)
 
     textPrint.print(screen, "Rects in memory: {}".format(str(len(curr_rects))))
