@@ -14,7 +14,7 @@ def create_fonts(font_sizes_list):
     fonts = []
     for size in font_sizes_list:
         fonts.append(
-            pygame.font.SysFont("Arial", size))
+            pygame.font.SysFont("couriernew", size))
     return fonts
  
  

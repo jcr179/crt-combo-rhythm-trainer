@@ -13,7 +13,7 @@ class TextPrint(object):
         self.x_reset_pos = self.x_pos 
         self.y_reset_pos = self.y_pos
         self.reset()
-        self.font = pygame.font.SysFont("Arial", 20)
+        self.font = pygame.font.SysFont("couriernew", 20)
  
     def print(self, my_screen, text_string):
         """ Draw text onto the screen. """

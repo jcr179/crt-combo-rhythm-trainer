@@ -13,7 +13,7 @@ Constants
 surf_x_size = 600
 surf_y_size = 800
 num_inputs = 9 # Xbox 360 controller : direction, a,b,x,y,lt,rt,lb,rb
-pygame.mixer.pre_init(44100, 16, num_inputs, 4096)
+#pygame.mixer.pre_init(44100, 16, num_inputs, 4096)
 
 left_offset = 10
 top_offset = 10
@@ -124,11 +124,16 @@ arrows = {1: pygame.transform.rotozoom(pygame.image.load(os.path.join(arrow_dir,
 }
 
 # sound effects sfx 
+enable_sounds = False
 
 sound_dir = os.path.join(os.getcwd(), "resources", "sfx")
 sfx_tap = pygame.mixer.Sound(os.path.join(sound_dir, "soft-hitnormal.ogg"))
 #sfx_release = pygame.mixer.Sound(os.path.join(sound_dir, "soft-hitfinish.wav"))
 sfx_played = []
+pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=64, allowedchanges=pygame.AUDIO_ALLOW_ANY_CHANGE)
+print('Number of channels: ', pygame.mixer.get_num_channels())
+ch1 = pygame.mixer.Channel(1)
+ch2 = pygame.mixer.Channel(2)
 
 # judgment line
 judgmentLineDistFromBottom = 100
@@ -310,9 +315,12 @@ while run:
             if curr_rects[j].top > surf_y_size:
                 rectsLeavingThisFrame += 1
             
-            if curr_rects[j].bottom  >= surf_y_size-judgmentLineDistFromBottom and not sfx_played[j]:
-                sfx_tap.play()
-                sfx_played[j] = True
+            if enable_sounds:
+                if curr_rects[j].bottom  >= surf_y_size-judgmentLineDistFromBottom and not sfx_played[j]:
+                    #print('sound played on channel ', sfx_tap.play(maxtime=50))
+                    print('sound on channel 2. busy? ', ch2.get_busy())
+                    ch1.play(sfx_tap)
+                    sfx_played[j] = True
 
         else: # is image
             curr_colors[j][0] += int(vx*dt)
@@ -321,15 +329,19 @@ while run:
             if curr_colors[j][1] > surf_y_size:
                 rectsLeavingThisFrame += 1
 
-            if curr_colors[j][1]  >= surf_y_size-judgmentLineDistFromBottom and not sfx_played[j]:
-                sfx_tap.play()
-                sfx_played[j] = True
+            if enable_sounds:
+                if curr_colors[j][1]  >= surf_y_size-judgmentLineDistFromBottom and not sfx_played[j]:
+                    #print('sound played on channel ', sfx_tap.play(maxtime=50))
+                    print('sound on channel 1. busy? ', ch1.get_busy())
+                    ch1.play(sfx_tap)
+                    sfx_played[j] = True
 
         
 
     notes.clearNote(rectsLeavingThisFrame, curr_colors, curr_lefts, curr_tops, curr_rects)
-    for _ in range(rectsLeavingThisFrame):
-        sfx_played.pop(0)
+    if enable_sounds:
+        for _ in range(rectsLeavingThisFrame):
+            sfx_played.pop(0)
 
     textPrint.print(screen, "Rects in memory: {}".format(str(len(curr_rects))))
 
