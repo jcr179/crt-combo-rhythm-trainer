@@ -139,6 +139,7 @@ second_6_gap = 999
 timeline_tick_spacing = 5 # visual aid for reading input timeline's frames, place a mark every X frames
 timeline_tick_char = '|'
 frc_tick_char = 'X'
+buf_6_size = 4 # buffer between 6 inputs during post_hcl input tracking 
 
 """
 In this game, the frames of a move begin the frame after it's executed.
@@ -242,6 +243,14 @@ def tick_hcl(frame_num, timeline, input_state, input_btns):
         timeline[frame_num] = 'f'
         input_saved = True
 
+    # Include all forward inputs after they first let go of 6
+    if input_state >= 1 and frame_num - buf_6_size >= 0 and '6' in input_btns:
+        buf_6 = timeline[frame_num-buf_6_size:frame_num] 
+        if all([x != '6' for x in buf_6]):
+
+            timeline[frame_num] = '6'
+            input_saved = True
+
     if not input_saved and (frc_frame1 <= frame_num <= frc_frame2):
         timeline[frame_num] = frc_tick_char
 
@@ -250,6 +259,8 @@ def tick_hcl(frame_num, timeline, input_state, input_btns):
 
     elif not input_saved and frame_num % timeline_tick_spacing == 0:
         timeline[frame_num] = timeline_tick_char
+
+    
 
     
     
@@ -490,17 +501,38 @@ while run:
 
     #textPrintEval.print(screen, "Inputs after HCL {}".format("".join(post_hcl_buffer)))
 
+    if frc_success:
+        frc_mark = 'X'
+    else:
+        frc_mark = ' '
+
+    if dash_gap <= 10:
+        dash_mark = 'X'
+    else:
+        dash_mark = ' '
+    
+    if second_6_gap <= 4:
+        second_6_mark = 'X'
+    else:
+        second_6_mark = ' '
+
     if fsm_hcl_state != 7:
         textPrintEval.print(screen, "Inputs after HCL {}".format("".join(prev_post_hcl_buffer)))
-    textPrintEval.print(screen, "FRC frame ({}f <= t <= {}f): {}".format(str(frc_frame1), str(frc_frame2), str(frc_frame_attempt)))
-    textPrintEval.print(screen, "Dash input gap (<=10f): {}f".format(str(dash_gap)))
-    textPrintEval.print(screen, "2nd 6 input gap (<=4f): {}f".format(str(second_6_gap)))
+
+    textPrintEval.print(screen, "[{}] FRC frame ({}f <= t <= {}f): {}".format(frc_mark, str(frc_frame1), str(frc_frame2), str(frc_frame_attempt)))
+    textPrintEval.print(screen, "[{}] Dash input gap (<=10f)     : {}f".format(dash_mark, str(dash_gap)))
+    textPrintEval.print(screen, "[{}] 2nd 6 input gap (<=4f)     : {}f".format(second_6_mark, str(second_6_gap)))
+    
+    """
     if frc_success:
         textPrintEval.print(screen, "ROMANTIC! FRC SUCCESS")
     if dash_gap <= 10:
         textPrintEval.print(screen, "NICE! Dash gap SUCCESS")
-        if second_6_gap <= 4:
-            textPrintEval.print(screen, "YOU ROCK! HCL 6FRC6 SUCCESS!!!")
+    if second_6_gap <= 4:
+        textPrintEval.print(screen, "COOL! 2nd 6 gap SUCCESS")
+    if frc_success and dash_gap <= 10 and second_6_gap <= 4:
+        textPrintEval.print(screen, "YOU ROCK! HCL 6FRC SUCCESS!!!")
+    """
     
     """ End Buffer input processing """
 
