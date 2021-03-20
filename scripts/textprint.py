@@ -6,26 +6,28 @@ class TextPrint(object):
     It has nothing to do with the joysticks, just outputting the
     information.
     """
-    def __init__(self, x_pos=10, y_pos=10):
+    def __init__(self, x_pos=10, y_pos=10, font="lucidaconsole", size=20):
         """ Constructor """
         self.x_pos = x_pos
         self.y_pos = y_pos
         self.x_reset_pos = self.x_pos 
         self.y_reset_pos = self.y_pos
         self.reset()
-        self.font = pygame.font.SysFont("couriernew", 20)
+        self.font = pygame.font.SysFont(font, size)
  
-    def print(self, my_screen, text_string):
+    def print(self, my_screen, text_string, color=(255, 255, 255), unicode=False):
         """ Draw text onto the screen. """
-        text_bitmap = self.font.render(text_string, True, (255,255,255))
+        if not unicode:
+            text_bitmap = self.font.render(text_string, True, color)
+        
         my_screen.blit(text_bitmap, [self.x_pos, self.y_pos])
         self.y_pos += self.line_height
  
-    def reset(self):
+    def reset(self, newline_spacing=25):
         """ Reset text to the top of the screen. """
         self.x_pos = self.x_reset_pos
         self.y_pos = self.y_reset_pos
-        self.line_height = 15
+        self.line_height = newline_spacing
  
     def indent(self):
         """ Indent the next line of text """

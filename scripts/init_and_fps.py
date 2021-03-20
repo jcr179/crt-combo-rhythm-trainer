@@ -14,7 +14,7 @@ def create_fonts(font_sizes_list):
     fonts = []
     for size in font_sizes_list:
         fonts.append(
-            pygame.font.SysFont("couriernew", size))
+            pygame.font.SysFont("lucidaconsole", size))
     return fonts
  
  
@@ -24,10 +24,10 @@ def render(fnt, what, color, where):
     screen.blit(text_to_show, where)
  
  
-def display_fps(fonts):
+def display_fps(fonts, pos=(0,0)):
     #"Data that will be rendered and blitted in _display"
     render(
-        fonts[0],
+        fonts[-2],
         what=str(int(round(clock.get_fps()))) + " fps",
         color="white",
-        where=(0, 0))
+        where=pos)

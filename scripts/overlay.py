@@ -12,11 +12,11 @@ if isdir(check_dir):
 else:
     print("Image directory ", check_dir, " does not exist.")
 
-def initOverlay(x_pos, y_pos, screen, layout="fightstick"):
+def initOverlay(layout="fightstick"):
     
     # load images for fightstick layout, implement switch later
-    base = pygame.image.load(join(img_dir, "overlay_fs_null.png"))
-    buttonOn = pygame.image.load(join(img_dir, "overlay_fs_button.png"))
-    balltop = pygame.image.load(join(img_dir, "overlay_fs_balltop.png"))
+    base = pygame.image.load(join(img_dir, "overlay_fs_null.png")).convert()
+    buttonOn = pygame.image.load(join(img_dir, "overlay_fs_button.png")).convert()
+    balltop = pygame.image.load(join(img_dir, "overlay_fs_balltop.png")).convert()
 
     return base, buttonOn, balltop 

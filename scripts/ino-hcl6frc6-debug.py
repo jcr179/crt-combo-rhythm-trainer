@@ -6,8 +6,6 @@ from init_and_fps import *
 import overlay
 from math import floor 
 import os
-from move_detection import fsm_hcl, tick_hcl, frc_frame1, frc_frame2
-from UI_Button import UI_Button
 
 import sys 
 import time 
@@ -16,12 +14,13 @@ import time
 """
 Constants
 """
-surf_x_size = 600
-surf_y_size = 320
+surf_x_size = 900
+surf_y_size = 600
 num_inputs = 9 # Xbox 360 controller : direction, a,b,x,y,lt,rt,lb,rb
+#pygame.mixer.pre_init(44100, 16, num_inputs, 4096)
 
 xb_button_map = {0: "A", 1: "B", 2: "X", 3: "Y", 4: "LB", 5: "RB", 6: "Back", 7: "Start", 8: "L3", 9: "R3"}
-xb_valid_button_nums = set([0, 1, 2, 3, 4, 5, 6])
+xb_valid_button_nums = set([0, 1, 2, 3, 4, 5])
 xb_axis_map = {-0.996: "RT", 0.996: "LT"}
 xb_dir_map = {(0, 0): 5, (1, 0): 6, (0, -1): 2, (-1, 0): 4, (0, 1): 8, (1, -1): 3, (-1, -1): 1, (-1, 1): 7, (1, 1): 9}
 xb_held_axes = {"LT": False, "RT": False}
@@ -39,12 +38,10 @@ for val in xb_button_map.values():
 for val in xb_axis_map.values():
     xb_held_buttons_frames[val] = 0
 
-app_name = "Heaven or HCL"
+app_name = "I wanna hcl 6frc6"
 screen, clock = init_screen_and_clock(surf_x_size, surf_y_size, app_name)
 fonts = create_fonts([32, 16, 14, 8])
-fps = 60 # include config setting for 58-62 fps?
-app_icon = pygame.image.load('icon2.png')
-pygame.display.set_icon(app_icon)
+fps = 60
 
 
 
@@ -52,24 +49,13 @@ dt = clock.tick(fps)
 
 run = True 
 
-# UI Buttons
-ui_btn_sfx = UI_Button(550, 10, 30, 20, off_color=(128, 128, 128), on_color=(0, 200, 0), text="SFX")
-
-# SFX
-pygame.mixer.init()
-pygame.mixer.music.load('hcl-6frc6.ogg')
-#sfx_guide = pygame.mixer.Sound('hcl-6frc6.ogg')
-
 # Joystick
 pygame.joystick.init()
 
 # Get ready to print text and initialize start position
-x_margin=10
-y_margin=10
-textPrint = TextPrint(x_pos=x_margin, y_pos=10)
-textPrintStates = TextPrint(x_pos=x_margin, y_pos=400)
-textPrintEval = TextPrint(x_pos=x_margin, y_pos=200)
-textPrintTips = TextPrint(x_pos=135, y_pos=100, font="tahoma", size=14)
+textPrint = TextPrint(x_pos=10, y_pos=10)
+textPrintStates = TextPrint(x_pos=10, y_pos=400)
+textPrintEval = TextPrint(x_pos=10, y_pos=200)
 
 buttonPressed = False 
 buttonReleased = False
@@ -77,74 +63,36 @@ buttonReleased = False
 
 debug = False
 
-
-# Interface graphics 
-ino_x_scale = 78
-ino_y_scale = 140
-ino_x_pos = 20
-ino_y_pos = 40
-img_ino_p1 = pygame.transform.scale(pygame.image.load('ino_p1.png'), (ino_x_scale, ino_y_scale)).convert()
-img_ino_p2 = pygame.transform.scale(pygame.image.load('ino_p2.png'), (ino_x_scale, ino_y_scale)).convert()
-first_ino_drawn = False
-
-ino_success_x_scale = 240#188
-ino_success_y_scale = 240
-ino_success_x_pos = 20
-ino_success_y_pos = 40
-img_ino_success_p1 = pygame.transform.scale(pygame.image.load('ino_success_p1.png'), (ino_x_scale, ino_y_scale)).convert()
-img_ino_success_p2 = pygame.transform.scale(pygame.image.load('ino_success_p2.png'), (ino_x_scale, ino_y_scale)).convert()
-
-frame_counter_x_pos = 215
-frame_counter_y_pos = 186
-img_frame_counter = pygame.image.load('frame_counter.png').convert()
-frame_counter_drawn = False
-
-speech_x_pos = 110
-speech_y_pos = 50
-speech_x_scale = 176
-speech_y_scale = 120
-img_speech = pygame.transform.scale(pygame.image.load('speech-bubble.png'), (speech_x_scale, speech_y_scale)).convert()
-first_attempt = True
-
-kimochi_x_pos = 145
-kimochi_y_pos = 95
-kimochi_x_scale = 117
-kimochi_y_scale = 67
-img_kimochi = pygame.transform.scale(pygame.image.load('kimochi.png'), (kimochi_x_scale, kimochi_y_scale)).convert()
-
-overlay_x_offset = 0
-overlay_y_offset = -20
-overlay_x_pos = 300 + overlay_x_offset
-overlay_y_pos = 50 + overlay_y_offset
-overlay_base, overlay_btn, overlay_balltop = overlay.initOverlay()
+# Overlay (x360, fightstick). Base dimensions are 539x262
+overlay_base, overlay_btn, overlay_balltop = overlay.initOverlay(300, 300, screen)
 overlay_rotate_deg = 0.0
 overlay_scale_factor = 0.5
-overlay_base = pygame.transform.rotozoom(overlay_base, overlay_rotate_deg, overlay_scale_factor).convert()
-overlay_btn = pygame.transform.rotozoom(overlay_btn, overlay_rotate_deg, overlay_scale_factor).convert()
-overlay_balltop = pygame.transform.rotozoom(overlay_balltop, overlay_rotate_deg, overlay_scale_factor).convert()
-
+overlay_base = pygame.transform.rotozoom(overlay_base, overlay_rotate_deg, overlay_scale_factor)
+overlay_btn = pygame.transform.rotozoom(overlay_btn, overlay_rotate_deg, overlay_scale_factor)
+overlay_balltop = pygame.transform.rotozoom(overlay_balltop, overlay_rotate_deg, overlay_scale_factor)
 overlay_map = {
-    0: [176 + overlay_x_offset/overlay_scale_factor, 175 + overlay_y_offset/overlay_scale_factor],      # A
-    1: [256 + overlay_x_offset/overlay_scale_factor, 145 + overlay_y_offset/overlay_scale_factor],      # B
-    2: [193 + overlay_x_offset/overlay_scale_factor, 87 + overlay_y_offset/overlay_scale_factor],       # X
-    3: [271 + overlay_x_offset/overlay_scale_factor, 52 + overlay_y_offset/overlay_scale_factor],       # Y
-    4: [445 + overlay_x_offset/overlay_scale_factor, 52 + overlay_y_offset/overlay_scale_factor],       # LB
-    5: [359 + overlay_x_offset/overlay_scale_factor, 52 + overlay_y_offset/overlay_scale_factor],       # RB
-    0.996: [428 + overlay_x_offset/overlay_scale_factor, 146 + overlay_y_offset/overlay_scale_factor],  # LT
-    -0.996: [342 + overlay_x_offset/overlay_scale_factor, 145 + overlay_y_offset/overlay_scale_factor], # RT
-    (0,0): [35 + overlay_x_offset/overlay_scale_factor, 109 + overlay_y_offset/overlay_scale_factor],   # neutral
-    (0,1): [35 + overlay_x_offset/overlay_scale_factor, 84 + overlay_y_offset/overlay_scale_factor],    # up
-    (0,-1): [35 + overlay_x_offset/overlay_scale_factor, 134 + overlay_y_offset/overlay_scale_factor],  # down 
-    (1,0): [63 + overlay_x_offset/overlay_scale_factor, 109 + overlay_y_offset/overlay_scale_factor],   # forward 
-    (-1,0): [7 + overlay_x_offset/overlay_scale_factor, 109 + overlay_y_offset/overlay_scale_factor],   # back
-    (1,1): [63 + overlay_x_offset/overlay_scale_factor, 84 + overlay_y_offset/overlay_scale_factor],   # up forward
-    (-1,-1): [7 + overlay_x_offset/overlay_scale_factor, 134 + overlay_y_offset/overlay_scale_factor],   # down back
-    (-1,1): [7 + overlay_x_offset/overlay_scale_factor, 84 + overlay_y_offset/overlay_scale_factor],   # up back 
-    (1,-1): [63 + overlay_x_offset/overlay_scale_factor, 134 + overlay_y_offset/overlay_scale_factor]    # down forward
+    0: [176, 175],      # A
+    1: [256, 145],      # B
+    2: [193, 87],       # X
+    3: [271, 52],       # Y
+    4: [445, 52],       # LB
+    5: [359, 52],       # RB
+    0.996: [428, 146],  # LT
+    -0.996: [342, 145], # RT
+    (0,0): [35, 109],   # neutral
+    (0,1): [35, 84],    # up
+    (0,-1): [35, 134],  # down 
+    (1,0): [63, 109],   # forward 
+    (-1,0): [7, 109],   # back
+    (1,1): [63, 84],   # up forward
+    (-1,-1): [7, 134],   # down back
+    (-1,1): [7, 84],   # up back 
+    (1,-1): [63, 134]    # down forward
 }
 for key, val in overlay_map.items():
     overlay_map[key] = (val[0]*overlay_scale_factor, val[1]*overlay_scale_factor)
-
+overlay_x = 300
+overlay_y = 50
 
 prevDir = 5 # direction stick pointed last in numpad notation
 
@@ -155,7 +103,6 @@ gg_button_map = {
     'Y' : 's',
     'RB' : 'h',
     'RT' : 'd',
-    'Back' : 'select'
 }
 
 # Circular input buffer
@@ -180,19 +127,19 @@ fsm_hcl_state = 0
 post_hcl_state = 0
 prev_fsm_hcl_states = ['.']*buf_size
 
+# frames for frc
+frc_frame1 = 16
+frc_frame2 = 17
 
 # evaluation
 frc_success = False
 frc_frame_attempt = 0
 dash_gap = 999
 second_6_gap = 999
-
-
-# side switching
-side = 'p1'
-side_prev = 'p1'
-side_switch_btn_pressed = False
-
+timeline_tick_spacing = 5 # visual aid for reading input timeline's frames, place a mark every X frames
+timeline_tick_char = '|'
+frc_tick_char = 'X'
+buf_6_size = 4 # buffer between 6 inputs during post_hcl input tracking 
 
 """
 In this game, the frames of a move begin the frame after it's executed.
@@ -207,9 +154,127 @@ so we can leave it as it is for now.
 This is the best we can do in pygame as its clock is based on millisecond accuracy. 
 """
 
+def fsm_hcl(buffer, input_state, input_btns):
+    prereqs = ['*', '6', '3', '2', '1', '4', '6']
+
+    print(input_btns)
+    if any(prereqs[input_state] in x for x in buffer) and input_state == 0 and '6' in input_btns:
+        return 1
+
+    # from 6 to 3 or 2
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 1 and '3' in input_btns:
+        return 2
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 1 and '2' in input_btns:
+        return 3
+
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 2 and '2' in input_btns: 
+        return 3
+
+    # from 2 to 1 or 4
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 3 and '1' in input_btns:
+        return 4
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 3 and '4' in input_btns:
+        return 5
+
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 4 and '4' in input_btns:
+        return 5
+
+    # Might jump from state 5 to 6 or 7 depending on if 6k happens on same frame
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 5 and '6' in input_btns:
+        return 6
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 5 and '6' in input_btns and 'k' in input_btns:
+        return 7
+
+    elif any(prereqs[input_state] in x for x in buffer) and input_state == 6 and 'k' in input_btns:
+        return 7
+
+    return input_state
+
+def tick_hcl(frame_num, timeline, input_state, input_btns):
+
+    output_state = input_state
+    input_saved = False
+
+    # Have to let go of 6 (or 3 or 9) from HCL
+    if input_state == 0 and not any(item in ['3', '6', '9'] for item in input_btns):
+        output_state = 1
+
+    # 1st 6
+    elif input_state == 1 and '6' in input_btns:
+        output_state = 2
+        timeline[frame_num] = '6'
+        input_saved = True
+
+    # Let go of 6 again to let another 6 be a valid forward dash BEFORE frc
+    elif input_state == 2 and not any(item in ['3', '6', '9'] for item in input_btns):
+        output_state = 3
+
+    # FRC
+    elif input_state == 3 and (set(['p', 'k', 's']).issubset(input_btns) or 
+            set(['p', 'k', 'h']).issubset(input_btns) or 
+            set(['k', 's', 'h']).issubset(input_btns)):
+        if frc_frame1 <= frame_num <= frc_frame2:
+            output_state = 4
+        if 'f' not in timeline:
+            timeline[frame_num] = 'f'
+            input_saved = True
+        
+    # 2nd 6
+    elif input_state == 4 and '6' in input_btns:
+        try:
+            dash1_frame = timeline.index('6')
+        except IndexError:
+            dash1_frame = 0
+
+        try:
+            frc_frame = timeline.index('f')
+        except IndexError:
+            frc_frame = 0
+
+        if frame_num - dash1_frame <= 10 and frame_num - frc_frame <= 4:
+            output_state = 5
+
+        if timeline.count('6') <= 1:
+            timeline[frame_num] = '6'
+            input_saved = True
+
+    # track frc success regardless of 6frc6 attempt
+    if (set(['p', 'k', 's']).issubset(input_btns) or set(['p', 'k', 'h']).issubset(input_btns) or set(['k', 's', 'h']).issubset(input_btns)) and 'f' not in timeline:
+        timeline[frame_num] = 'f'
+        input_saved = True
+
+    # Include all forward inputs after they first let go of 6
+    if input_state >= 1 and frame_num - buf_6_size >= 0 and '6' in input_btns:
+        buf_6 = timeline[frame_num-buf_6_size:frame_num] 
+        if all([x != '6' for x in buf_6]):
+
+            timeline[frame_num] = '6'
+            input_saved = True
+
+    if not input_saved and (frc_frame1 <= frame_num <= frc_frame2):
+        timeline[frame_num] = frc_tick_char
+
+    elif not input_saved and frame_num % timeline_tick_spacing:
+        timeline[frame_num] = '-'
+
+    elif not input_saved and frame_num % timeline_tick_spacing == 0:
+        timeline[frame_num] = timeline_tick_char
+
+    
+
+    
+    
+        
+
+    print('FRAME ', frame_num, ': ' + str(input_state))
+    print('\tinput_btns: ', input_btns)
+    print('\t\t', set(['p', 'k', 's']).issubset(input_btns))
+    print('\t\t', set(['p', 'k', 'h']).issubset(input_btns))
+    print('\t\t', set(['k', 's', 'h']).issubset(input_btns))
+
+    return timeline, output_state
+
 while run:
-
-
     
     for event in pygame.event.get():
          
@@ -251,57 +316,12 @@ while run:
         elif event.type == pygame.JOYHATMOTION:
             print("Direction ", xb_dir_map[event.value])
     
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_pos = pygame.mouse.get_pos()
-
-            if ui_btn_sfx.rect.collidepoint(mouse_pos):
-                ui_btn_sfx.toggle = not ui_btn_sfx.toggle
-                if ui_btn_sfx.toggle:
-                    pygame.mixer.music.play(-1)
-                else:
-                    if pygame.mixer.music.get_busy(): 
-                        pygame.mixer.music.stop()
-
-
-    # Handle graphics each tick
     textPrint.reset()
     textPrintStates.reset()
     textPrintEval.reset()
-    textPrintTips.reset(15)
     screen.fill((0, 0, 0)) # put before drawing
 
-    
-    screen.blit(overlay_base, [overlay_x_pos, overlay_y_pos])
-
-    screen.blit(img_frame_counter, [frame_counter_x_pos, frame_counter_y_pos])
-
-    if not frc_success or dash_gap > 10 or second_6_gap > 4:
-        # Standard I-No sprites
-        if not first_ino_drawn:
-            screen.blit(img_ino_p1, [ino_x_pos, ino_y_pos])
-
-        if side == 'p2' and side_prev == 'p1':
-            screen.blit(img_ino_p2, [ino_x_pos, ino_y_pos])
-            first_ino_drawn = True
-
-        if side == 'p1' and side_prev == 'p2':
-            screen.blit(img_ino_p1, [ino_x_pos, ino_y_pos])
-
-    else:
-        # Success I-No sprites
-        if not first_ino_drawn:
-            screen.blit(img_ino_success_p1, [ino_success_x_pos, ino_success_y_pos])
-
-        if side == 'p2' and side_prev == 'p1':
-            screen.blit(img_ino_success_p2, [ino_success_x_pos, ino_success_y_pos])
-            first_ino_drawn = True
-
-        if side == 'p1' and side_prev == 'p2':
-            screen.blit(img_ino_success_p1, [ino_success_x_pos, ino_success_y_pos])
-
-    screen.blit(img_speech, [speech_x_pos, speech_y_pos])
-
-    ui_btn_sfx.draw(screen)    
+    screen.blit(overlay_base, [overlay_x, overlay_y])
 
     if debug: 
         # Get count of joysticks
@@ -361,7 +381,7 @@ while run:
     joystick = pygame.joystick.Joystick(0)
     joystick.init()
     name = joystick.get_name()
-    if debug: textPrint.print(screen, "{}".format(name))
+    textPrint.print(screen, "{}".format(name))
 
     axis = joystick.get_axis(2)
 
@@ -373,22 +393,10 @@ while run:
         if button and button_num in xb_valid_button_nums:
             input_btns.append(gg_button_map.get(xb_button_map[button_num], ''))
 
-            if debug: 
-                textPrint.print(screen, "{}".format(xb_button_map[button_num]))
-
-            if button_num != 6: # If it's any button other than Select, blit to overlay
-                screen.blit(overlay_btn, [overlay_x_pos+overlay_map[button_num][0]-overlay_x_offset, overlay_y_pos+overlay_map[button_num][1]-overlay_y_offset])
-            elif button_num == 6 and not side_switch_btn_pressed:
-                side_prev = side 
-                if side == 'p1': side = 'p2'
-                else: side = 'p1'
-                
-                side_switch_btn_pressed = True
+            textPrint.print(screen, "{}".format(xb_button_map[button_num]))
+            screen.blit(overlay_btn, [overlay_x+overlay_map[button_num][0], overlay_y+overlay_map[button_num][1]])
             xb_held_buttons[xb_button_map[button_num]] += 1
             print(xb_held_buttons[xb_button_map[button_num]], xb_button_map[button_num])
-
-    if 'select' not in input_btns:
-        side_switch_btn_pressed = False
 
 
     axis = round(axis, 3)
@@ -396,37 +404,31 @@ while run:
     if axis == 0.996:
         input_btns.append(gg_button_map.get('LT', ''))
 
-        if debug:
-            textPrint.print(screen, "{}".format(xb_axis_map[axis]))
-
-        screen.blit(overlay_btn, [overlay_x_pos+overlay_map[axis][0]-overlay_x_offset, overlay_y_pos+overlay_map[axis][1]-overlay_y_offset])
+        textPrint.print(screen, "{}".format(xb_axis_map[axis]))
+        screen.blit(overlay_btn, [overlay_x+overlay_map[axis][0], overlay_y+overlay_map[axis][1]])
         xb_held_buttons[xb_axis_map[axis]] += 1
         print(xb_held_buttons[xb_axis_map[axis]], xb_axis_map[axis])
     elif axis == -0.996:
         input_btns.append(gg_button_map.get('RT', ''))
 
-        if debug:
-            textPrint.print(screen, "{}".format(xb_axis_map[axis]))
-
-        screen.blit(overlay_btn, [overlay_x_pos+overlay_map[axis][0]-overlay_x_offset, overlay_y_pos+overlay_map[axis][1]-overlay_y_offset])
+        textPrint.print(screen, "{}".format(xb_axis_map[axis]))
+        screen.blit(overlay_btn, [overlay_x+overlay_map[axis][0], overlay_y+overlay_map[axis][1]])
         xb_held_buttons[xb_axis_map[axis]] += 1
         print(xb_held_buttons[xb_axis_map[axis]], xb_axis_map[axis])   
 
     # Get directional input
     hat = joystick.get_hat(0)
-    if debug:
-        textPrint.print(screen, "{}".format(xb_dir_map[hat]))
+    textPrint.print(screen, "{}".format(xb_dir_map[hat]))
 
     input_btns.append(str(xb_dir_map[hat]))
 
-    if debug:
-        textPrint.print(screen, "{}".format("".join([str(item) for item in input_btns])))
+    textPrint.print(screen, "{}".format("".join([str(item) for item in input_btns])))
     
     # TODO fix for hold directions ; charge moves
     if xb_dir_map[hat] != 5 and xb_dir_map[hat] != prevDir:
         pass
 
-    screen.blit(overlay_balltop, [overlay_x_pos+overlay_map[hat][0]-overlay_x_offset, overlay_y_pos+overlay_map[hat][1]-overlay_y_offset])
+    screen.blit(overlay_balltop, [overlay_x+overlay_map[hat][0], overlay_y+overlay_map[hat][1]])
     prevDir = xb_dir_map[hat]
      
     """ End Xbox 360 """
@@ -440,7 +442,7 @@ while run:
     prev_fsm_hcl_states[buf_ptr] = fsm_hcl_state
 
     if fsm_hcl_state < 7: # If not currently in an HCL
-        fsm_hcl_state = fsm_hcl(buffer, fsm_hcl_state, input_btns, side)
+        fsm_hcl_state = fsm_hcl(buffer, fsm_hcl_state, input_btns)
         if all(fsm_hcl_state == x for x in prev_fsm_hcl_states):
             fsm_hcl_state = 0
 
@@ -450,7 +452,7 @@ while run:
         #if post_hcl_frame_num == 0:
         #    post_hcl_frame_num = 1
 
-        post_hcl_buffer, post_hcl_state = tick_hcl(post_hcl_frame_num, post_hcl_buffer, post_hcl_state, input_btns, side)
+        post_hcl_buffer, post_hcl_state = tick_hcl(post_hcl_frame_num, post_hcl_buffer, post_hcl_state, input_btns)
 
         post_hcl_frame_num += 1
 
@@ -489,7 +491,6 @@ while run:
             post_hcl_state = 0
             post_hcl_frame_num = 0
             prev_max_post_hcl_state = 0
-            first_attempt = False
     
 
     textPrintStates.print(screen, "fsm_hcl_state {}".format(str(fsm_hcl_state)))
@@ -518,31 +519,25 @@ while run:
     if fsm_hcl_state != 7:
         textPrintEval.print(screen, "Inputs after HCL {}".format("".join(prev_post_hcl_buffer)))
 
-    textPrintEval.print(screen, "[{}] FRC frame {}f ≤ t ≤ {}f  : {}".format(frc_mark, str(frc_frame1), str(frc_frame2), str(frc_frame_attempt)))
-    textPrintEval.print(screen, "[{}] Dash input gap ≤ 10f     : {}f".format(dash_mark, str(dash_gap)))
-    textPrintEval.print(screen, "[{}] FRC/2nd 6 input gap ≤ 4f : {}f".format(second_6_mark, str(second_6_gap)))
+    textPrintEval.print(screen, "[{}] FRC frame ({}f <= t <= {}f): {}".format(frc_mark, str(frc_frame1), str(frc_frame2), str(frc_frame_attempt)))
+    textPrintEval.print(screen, "[{}] Dash input gap (<=10f)     : {}f".format(dash_mark, str(dash_gap)))
+    textPrintEval.print(screen, "[{}] 2nd 6 input gap (<=4f)     : {}f".format(second_6_mark, str(second_6_gap)))
+    
+    """
+    if frc_success:
+        textPrintEval.print(screen, "ROMANTIC! FRC SUCCESS")
+    if dash_gap <= 10:
+        textPrintEval.print(screen, "NICE! Dash gap SUCCESS")
+    if second_6_gap <= 4:
+        textPrintEval.print(screen, "COOL! 2nd 6 gap SUCCESS")
+    if frc_success and dash_gap <= 10 and second_6_gap <= 4:
+        textPrintEval.print(screen, "YOU ROCK! HCL 6FRC SUCCESS!!!")
+    """
     
     """ End Buffer input processing """
 
-    """ Tip display start """
-    if not frc_success and frc_frame_attempt != 999 and not first_attempt:
-        if frc_frame_attempt < min(frc_frame1, frc_frame2):
-            textPrintTips.print(screen, "FRC {}f later.".format(str(frc_frame1 - frc_frame_attempt)), (0, 0, 0))
-        else:
-            textPrintTips.print(screen, "FRC {}f sooner.".format(str(frc_frame_attempt - frc_frame2)), (0, 0, 0))
 
-    if dash_gap > 10 and dash_gap != 999 and not first_attempt:
-        textPrintTips.print(screen, "Tighten dash by {}f.".format(str(dash_gap - 10)), (0, 0, 0))
-
-    if second_6_gap > 4 and second_6_gap != 999 and not first_attempt:
-        textPrintTips.print(screen, "Tighten FRC6 by {}f.".format(str(second_6_gap - 4)), (0, 0, 0))
-
-    if frc_success and dash_gap <= 10 and second_6_gap <= 4 and not first_attempt:
-        screen.blit(img_kimochi, [kimochi_x_pos, kimochi_y_pos])
-
-    """ Tip display end """
-
-    display_fps(fonts, (x_margin, y_margin))
+    display_fps(fonts)
 
     #pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(0, surf_y_size-300, surf_x_size, 5))
 
