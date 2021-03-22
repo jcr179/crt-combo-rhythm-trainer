@@ -8,7 +8,6 @@ from math import floor
 import os
 from move_detection import fsm_hcl, tick_hcl, frc_frame1, frc_frame2
 from UI_Button import UI_Button
-
 import sys 
 import time 
 
@@ -47,17 +46,43 @@ app_icon = pygame.image.load('icon2.png')
 pygame.display.set_icon(app_icon)
 
 
-
 dt = clock.tick(fps)
 
 run = True 
 
 # UI Buttons
-ui_btn_sfx = UI_Button(550, 10, 30, 20, off_color=(128, 128, 128), on_color=(0, 200, 0), text="SFX")
+ui_btn_sfx = UI_Button(550, 10, 30, 20, off_color=(128, 128, 128), on_color=(136, 248, 224), text="SFX")
+ui_btn_hitstop = UI_Button(440, 10, 100, 20, off_color=(136, 248, 224), on_color=(136, 248, 224), text="HITSTOP: Raw")
+hitstop_frames = [0, 19, 22, 28]
+hitstop_vals = len(hitstop_frames)
+hitstop_idx = 0
+hitstop_dict = {
+    0: "Raw",
+    1: "5K",
+    2: "2S",
+    3: "5H"
+}
+hitstop = hitstop_frames[hitstop_idx]
+
+def change_hitstop(btn):
+    global hitstop_idx
+    global hitstop
+    hitstop_idx = (hitstop_idx + 1) % hitstop_vals
+    hitstop = hitstop_frames[hitstop_idx]
+    btn.text="HITSTOP: " + str(hitstop_dict[hitstop_idx])
+
+capture_triggers_dict = {
+        0: "hcl",
+        1: "k",
+        2: "s",
+        3: "h"
+    }
+
+hitstop_delay = 0 # Increment this with each frame as a counter to see if you've waited long enough for hitstop
 
 # SFX
 pygame.mixer.init()
-pygame.mixer.music.load('hcl-6frc6.ogg')
+pygame.mixer.music.load('hcl-6frc6.ogg') # inaudible when GG window is focused
 #sfx_guide = pygame.mixer.Sound('hcl-6frc6.ogg')
 
 # Joystick
@@ -209,7 +234,7 @@ This is the best we can do in pygame as its clock is based on millisecond accura
 
 while run:
 
-
+    capture_trigger = capture_triggers_dict[hitstop_idx]
     
     for event in pygame.event.get():
          
@@ -262,6 +287,8 @@ while run:
                     if pygame.mixer.music.get_busy(): 
                         pygame.mixer.music.stop()
 
+            elif ui_btn_hitstop.rect.collidepoint(mouse_pos):
+                change_hitstop(ui_btn_hitstop)
 
     # Handle graphics each tick
     textPrint.reset()
@@ -302,6 +329,9 @@ while run:
     screen.blit(img_speech, [speech_x_pos, speech_y_pos])
 
     ui_btn_sfx.draw(screen)    
+    ui_btn_hitstop.draw(screen)
+
+
 
     if debug: 
         # Get count of joysticks
@@ -433,28 +463,51 @@ while run:
 
 
     """ Start Buffer input processing """
+    
+    
+    
     buffer[buf_ptr] = input_btns
     if buf_ptr == 0:
         buffer[0].append('*') # Special case for beginning to detect HCL
 
     prev_fsm_hcl_states[buf_ptr] = fsm_hcl_state
 
-    if fsm_hcl_state < 7: # If not currently in an HCL
+    if fsm_hcl_state < 7 and capture_trigger == "hcl": # If not currently in an HCL
         fsm_hcl_state = fsm_hcl(buffer, fsm_hcl_state, input_btns, side)
         if all(fsm_hcl_state == x for x in prev_fsm_hcl_states):
             fsm_hcl_state = 0
 
+    elif fsm_hcl_state < 7 and capture_trigger == "k":
+        if 'k' in input_btns:
+            fsm_hcl_state = 7
+
+    elif fsm_hcl_state < 7 and capture_trigger == "s":
+        if 's' in input_btns:
+            fsm_hcl_state = 7
+
+    elif fsm_hcl_state < 7 and capture_trigger == "h":
+        if 'h' in input_btns:
+            fsm_hcl_state = 7
+
+    
+
     buf_ptr = (buf_ptr + 1) % buf_size
 
-    if fsm_hcl_state == 7: # You're in an HCL
+    if fsm_hcl_state == 7: # You're in an HCL/pressed a normal to cancel into HCL (depending on hitstop selected)
         #if post_hcl_frame_num == 0:
         #    post_hcl_frame_num = 1
 
-        post_hcl_buffer, post_hcl_state = tick_hcl(post_hcl_frame_num, post_hcl_buffer, post_hcl_state, input_btns, side)
+        if hitstop_delay >= hitstop:
+            post_hcl_buffer, post_hcl_state = tick_hcl(post_hcl_frame_num, post_hcl_buffer, post_hcl_state, input_btns, side)
 
-        post_hcl_frame_num += 1
+            post_hcl_frame_num += 1
 
-        prev_max_post_hcl_state = max(prev_max_post_hcl_state, post_hcl_state)
+            prev_max_post_hcl_state = max(prev_max_post_hcl_state, post_hcl_state)
+
+        else:
+            hitstop_delay += 1
+
+
 
         if post_hcl_frame_num < post_hcl_frames:
             textPrintEval.print(screen, "Inputs after HCL {}".format("".join(post_hcl_buffer)))
@@ -490,13 +543,14 @@ while run:
             post_hcl_frame_num = 0
             prev_max_post_hcl_state = 0
             first_attempt = False
+            hitstop_delay = 0
     
-
-    textPrintStates.print(screen, "fsm_hcl_state {}".format(str(fsm_hcl_state)))
-    textPrintStates.print(screen, "buf {}".format(buffer))
-    textPrintStates.print(screen, "prev_fsm_hcl_states {}".format(prev_fsm_hcl_states))
-    textPrintStates.print(screen, "post_hcl_state {}".format(post_hcl_state))
-    textPrintStates.print(screen, "prev_max_post_hcl_state {}".format(prev_max_post_hcl_state))
+    if debug:
+        textPrintStates.print(screen, "fsm_hcl_state {}".format(str(fsm_hcl_state)))
+        textPrintStates.print(screen, "buf {}".format(buffer))
+        textPrintStates.print(screen, "prev_fsm_hcl_states {}".format(prev_fsm_hcl_states))
+        textPrintStates.print(screen, "post_hcl_state {}".format(post_hcl_state))
+        textPrintStates.print(screen, "prev_max_post_hcl_state {}".format(prev_max_post_hcl_state))
 
     #textPrintEval.print(screen, "Inputs after HCL {}".format("".join(post_hcl_buffer)))
 

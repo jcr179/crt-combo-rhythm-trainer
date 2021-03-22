@@ -150,11 +150,12 @@ def tick_hcl(frame_num, timeline, input_state, input_btns, side):
     
     
         
-
+    """
     print('FRAME ', frame_num, ': ' + str(input_state))
     print('\tinput_btns: ', input_btns)
     print('\t\t', set(['p', 'k', 's']).issubset(input_btns))
     print('\t\t', set(['p', 'k', 'h']).issubset(input_btns))
     print('\t\t', set(['k', 's', 'h']).issubset(input_btns))
+    """
 
     return timeline, output_state
