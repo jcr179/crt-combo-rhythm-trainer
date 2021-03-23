@@ -10,7 +10,24 @@ from move_detection import fsm_hcl, tick_hcl, frc_frame1, frc_frame2
 from UI_Button import UI_Button
 import sys 
 import time 
+from config_read import get_mapping_from_file
 
+from ctypes import windll
+SetWindowPos = windll.user32.SetWindowPos
+
+NOSIZE = 1
+NOMOVE = 2
+TOPMOST = -1
+NOT_TOPMOST = -2
+
+def alwaysOnTop(yesOrNo):
+    zorder = (NOT_TOPMOST, TOPMOST)[yesOrNo] # choose a flag according to bool 0 or 1
+    hwnd = pygame.display.get_wm_info()['window'] # handle to the window
+    SetWindowPos(hwnd, zorder, 0, 0, 0, 0, NOMOVE|NOSIZE)
+
+pygame.init()
+
+alwaysOnTop(1)
 
 """
 Constants
@@ -25,6 +42,17 @@ xb_axis_map = {-0.996: "RT", 0.996: "LT"}
 xb_dir_map = {(0, 0): 5, (1, 0): 6, (0, -1): 2, (-1, 0): 4, (0, 1): 8, (1, -1): 3, (-1, -1): 1, (-1, 1): 7, (1, 1): 9}
 xb_held_axes = {"LT": False, "RT": False}
 xb_axis_released = ""
+
+"""
+ps_button_map = {0: "Square", 1: "Cross", 2: "Circle", 3: "Triangle", 4: "L1", 5: "R1", 6: "L2", 7: "R2", 8: "Back", 9: "Start", 
+    10: "L3", 11: "R3"}
+ps_valid_button_nums = set([0, 1, 2, 3, 4, 5, 6, 7, 8])
+ps_axis_map = {-0.996: "RT", 0.996: "LT"}
+ps_dir_map = {(0, 0): 5, (1, 0): 6, (0, -1): 2, (-1, 0): 4, (0, 1): 8, (1, -1): 3, (-1, -1): 1, (-1, 1): 7, (1, 1): 9}
+ps_held_axes = {"LT": False, "RT": False}
+ps_axis_released = ""
+"""
+
 # LT+RT not supported; this gives same reading as no triggers pressed
 xb_held_buttons = {}
 for val in xb_button_map.values():
@@ -53,14 +81,17 @@ run = True
 # UI Buttons
 ui_btn_sfx = UI_Button(550, 10, 30, 20, off_color=(128, 128, 128), on_color=(136, 248, 224), text="SFX")
 ui_btn_hitstop = UI_Button(440, 10, 100, 20, off_color=(136, 248, 224), on_color=(136, 248, 224), text="HITSTOP: Raw")
-hitstop_frames = [0, 19, 22, 28]
+ui_btn_config = UI_Button(330, 10, 100, 20, off_color=(136, 248, 224), on_color=(136, 248, 224), text="LOAD CONFIG")
+hitstop_changed = 0 
+config_changed = 0
+
+hitstop_frames = [0, 19, 22]
 hitstop_vals = len(hitstop_frames)
 hitstop_idx = 0
 hitstop_dict = {
     0: "Raw",
     1: "5K",
-    2: "2S",
-    3: "5H"
+    2: "2S"
 }
 hitstop = hitstop_frames[hitstop_idx]
 
@@ -74,8 +105,7 @@ def change_hitstop(btn):
 capture_triggers_dict = {
         0: "hcl",
         1: "k",
-        2: "s",
-        3: "h"
+        2: "s"
     }
 
 hitstop_delay = 0 # Increment this with each frame as a counter to see if you've waited long enough for hitstop
@@ -112,12 +142,12 @@ img_ino_p1 = pygame.transform.scale(pygame.image.load('ino_p1.png'), (ino_x_scal
 img_ino_p2 = pygame.transform.scale(pygame.image.load('ino_p2.png'), (ino_x_scale, ino_y_scale)).convert()
 first_ino_drawn = False
 
-ino_success_x_scale = 240#188
-ino_success_y_scale = 240
+ino_success_x_scale = 78 #168
+ino_success_y_scale = 140 #240
 ino_success_x_pos = 20
 ino_success_y_pos = 40
-img_ino_success_p1 = pygame.transform.scale(pygame.image.load('ino_success_p1.png'), (ino_x_scale, ino_y_scale)).convert()
-img_ino_success_p2 = pygame.transform.scale(pygame.image.load('ino_success_p2.png'), (ino_x_scale, ino_y_scale)).convert()
+img_ino_success_p1 = pygame.transform.scale(pygame.image.load('ino_success_p1.png'), (ino_success_x_scale, ino_success_y_scale)).convert()
+img_ino_success_p2 = pygame.transform.scale(pygame.image.load('ino_success_p2.png'), (ino_success_x_scale, ino_success_y_scale)).convert()
 
 frame_counter_x_pos = 215
 frame_counter_y_pos = 186
@@ -136,6 +166,17 @@ kimochi_y_pos = 95
 kimochi_x_scale = 117
 kimochi_y_scale = 67
 img_kimochi = pygame.transform.scale(pygame.image.load('kimochi.png'), (kimochi_x_scale, kimochi_y_scale)).convert()
+
+# Default arcade layout for now.
+gg_button_map = {
+    'X' : 'k',
+    'A' : 'p',
+    'Y' : 's',
+    'RB' : 'h',
+    'RT' : 'd',
+    'Back' : 'select'
+}
+gg_button_map = get_mapping_from_file('config.txt')
 
 overlay_x_offset = 0
 overlay_y_offset = -20
@@ -173,15 +214,6 @@ for key, val in overlay_map.items():
 
 prevDir = 5 # direction stick pointed last in numpad notation
 
-# Default arcade layout for now.
-gg_button_map = {
-    'X' : 'k',
-    'A' : 'p',
-    'Y' : 's',
-    'RB' : 'h',
-    'RT' : 'd',
-    'Back' : 'select'
-}
 
 # Circular input buffer
 # Every frame, increment buf_ptr and add list of whatever inputs were read
@@ -289,6 +321,11 @@ while run:
 
             elif ui_btn_hitstop.rect.collidepoint(mouse_pos):
                 change_hitstop(ui_btn_hitstop)
+                hitstop_changed = 1
+
+            elif ui_btn_config.rect.collidepoint(mouse_pos):
+                gg_button_map = get_mapping_from_file('config.txt')
+                config_changed = 1
 
     # Handle graphics each tick
     textPrint.reset()
@@ -330,6 +367,20 @@ while run:
 
     ui_btn_sfx.draw(screen)    
     ui_btn_hitstop.draw(screen)
+    ui_btn_config.draw(screen)
+
+    if hitstop_changed:
+        textPrintTips.print(screen, "Hitstop offset changed.", color=(0, 0, 0))
+        hitstop_changed += 1
+        if hitstop_changed >= 180:
+            hitstop_changed = 0
+
+    if config_changed:
+        textPrintTips.print(screen, "Button config loaded.", color=(0,0,0))
+        config_changed += 1
+        if config_changed >= 180:
+            config_changed = 0
+
 
 
 
@@ -388,6 +439,10 @@ while run:
 
     # Have only 1 plugged in when starting, TODO make a class and put this into a library, call all these checks
     """ Begin Xbox 360 """
+    joystick_check = pygame.joystick.get_count()
+    if joystick_check == 0:
+        print('No controller detected. Please connect controller before running program. Exiting safely.')
+        break
     joystick = pygame.joystick.Joystick(0)
     joystick.init()
     name = joystick.get_name()
@@ -415,7 +470,8 @@ while run:
                 
                 side_switch_btn_pressed = True
             xb_held_buttons[xb_button_map[button_num]] += 1
-            print(xb_held_buttons[xb_button_map[button_num]], xb_button_map[button_num])
+            if debug:
+                print(xb_held_buttons[xb_button_map[button_num]], xb_button_map[button_num])
 
     if 'select' not in input_btns:
         side_switch_btn_pressed = False
@@ -431,7 +487,8 @@ while run:
 
         screen.blit(overlay_btn, [overlay_x_pos+overlay_map[axis][0]-overlay_x_offset, overlay_y_pos+overlay_map[axis][1]-overlay_y_offset])
         xb_held_buttons[xb_axis_map[axis]] += 1
-        print(xb_held_buttons[xb_axis_map[axis]], xb_axis_map[axis])
+        if debug:
+            print(xb_held_buttons[xb_axis_map[axis]], xb_axis_map[axis])
     elif axis == -0.996:
         input_btns.append(gg_button_map.get('RT', ''))
 
@@ -440,7 +497,8 @@ while run:
 
         screen.blit(overlay_btn, [overlay_x_pos+overlay_map[axis][0]-overlay_x_offset, overlay_y_pos+overlay_map[axis][1]-overlay_y_offset])
         xb_held_buttons[xb_axis_map[axis]] += 1
-        print(xb_held_buttons[xb_axis_map[axis]], xb_axis_map[axis])   
+        if debug:
+            print(xb_held_buttons[xb_axis_map[axis]], xb_axis_map[axis])   
 
     # Get directional input
     hat = joystick.get_hat(0)

@@ -40,7 +40,7 @@ def fsm_hcl(buffer, input_state, input_btns, side):
     prereqs[1:] = [dirmap[side][x] for x in prereqs[1:]]
     #print(prereqs)
 
-    print(input_btns)
+    #print(input_btns)
     if any(prereqs[input_state] in x for x in buffer) and input_state == 0 and dirmap[side]['6'] in input_btns:
         return 1
 
@@ -106,12 +106,12 @@ def tick_hcl(frame_num, timeline, input_state, input_btns, side):
     elif input_state == 4 and dirmap[side]['6'] in input_btns:
         try:
             dash1_frame = timeline.index('6')
-        except IndexError:
+        except ValueError:
             dash1_frame = 0
 
         try:
             frc_frame = timeline.index('f')
-        except IndexError:
+        except ValueError:
             frc_frame = 0
 
         if frame_num - dash1_frame <= 10 and frame_num - frc_frame <= 4:
