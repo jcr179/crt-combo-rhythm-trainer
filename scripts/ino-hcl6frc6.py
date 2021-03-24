@@ -13,6 +13,11 @@ import time
 from config_read import get_mapping_from_file
 
 from ctypes import windll
+
+
+# Meta
+version = "v0.1"
+
 SetWindowPos = windll.user32.SetWindowPos
 
 NOSIZE = 1
@@ -79,9 +84,18 @@ dt = clock.tick(fps)
 run = True 
 
 # UI Buttons
-ui_btn_sfx = UI_Button(550, 10, 30, 20, off_color=(128, 128, 128), on_color=(136, 248, 224), text="SFX")
-ui_btn_hitstop = UI_Button(440, 10, 100, 20, off_color=(136, 248, 224), on_color=(136, 248, 224), text="HITSTOP: Raw")
-ui_btn_config = UI_Button(330, 10, 100, 20, off_color=(136, 248, 224), on_color=(136, 248, 224), text="LOAD CONFIG")
+ui_btn_help = UI_Button(550, 10, 40, 20, off_color=(40, 200, 40), on_color=(40, 200, 40), text="HELP")
+ui_btn_close_help = UI_Button(465, 270, 90, 20, off_color=(200, 40, 40), on_color=(200, 40, 40), text="CLOSE HELP")
+ui_btn_sfx = UI_Button(510, 10, 30, 20, off_color=(128, 128, 128), on_color=(136, 248, 224), text="SFX")
+ui_btn_hitstop = UI_Button(400, 10, 100, 20, off_color=(136, 248, 224), on_color=(136, 248, 224), text="HITSTOP: Raw")
+ui_btn_config = UI_Button(290, 10, 100, 20, off_color=(136, 248, 224), on_color=(136, 248, 224), text="LOAD CONFIG")
+ui_btn_side_switch = UI_Button(180, 10, 100, 20, off_color=(136, 248, 224), on_color=(136, 248, 224), text="SIDE SWITCH")
+
+display_help_window = False 
+#help_msg = "hello\nyep"
+ui_win_help_border = UI_Button(30, 25, 540, 275, off_color=(40, 200, 40), on_color=(40, 200, 40))
+ui_win_help = UI_Button(35, 30, 530, 265, off_color=(54, 57, 62), on_color=(54, 57, 62))
+
 hitstop_changed = 0 
 config_changed = 0
 
@@ -125,6 +139,7 @@ textPrint = TextPrint(x_pos=x_margin, y_pos=10)
 textPrintStates = TextPrint(x_pos=x_margin, y_pos=400)
 textPrintEval = TextPrint(x_pos=x_margin, y_pos=200)
 textPrintTips = TextPrint(x_pos=135, y_pos=100, font="tahoma", size=14)
+textPrintHelp = TextPrint(x_pos=38, y_pos=35, font="lucidaconsole", size=12)
 
 buttonPressed = False 
 buttonReleased = False
@@ -327,6 +342,20 @@ while run:
                 gg_button_map = get_mapping_from_file('config.txt')
                 config_changed = 1
 
+            elif ui_btn_help.rect.collidepoint(mouse_pos):
+                display_help_window = True
+
+            elif ui_btn_close_help.rect and ui_btn_close_help.rect.collidepoint(mouse_pos):
+                display_help_window = False
+
+            elif ui_btn_side_switch.rect.collidepoint(mouse_pos):
+                side_prev = side 
+                if side == 'p1': side = 'p2'
+                else: side = 'p1'
+                
+                side_switch_btn_pressed = True
+
+
     # Handle graphics each tick
     textPrint.reset()
     textPrintStates.reset()
@@ -365,9 +394,11 @@ while run:
 
     screen.blit(img_speech, [speech_x_pos, speech_y_pos])
 
+    ui_btn_help.draw(screen)
     ui_btn_sfx.draw(screen)    
     ui_btn_hitstop.draw(screen)
     ui_btn_config.draw(screen)
+    ui_btn_side_switch.draw(screen)
 
     if hitstop_changed:
         textPrintTips.print(screen, "Hitstop offset changed.", color=(0, 0, 0))
@@ -381,6 +412,7 @@ while run:
         if config_changed >= 180:
             config_changed = 0
 
+    
 
 
 
@@ -655,6 +687,57 @@ while run:
     """ Tip display end """
 
     display_fps(fonts, (x_margin, y_margin))
+
+    """ Help display start """
+    if display_help_window:
+        ui_win_help_border.draw(screen)
+        ui_win_help.draw(screen)
+        ui_btn_close_help.draw(screen)
+        textPrintHelp.print(screen, 
+            "1. Ensure your button config is set correctly. The timing is set to trigger") 
+        textPrintHelp.print(screen,
+            "on detection of an HCL input, K input, or S input for Hitstop Offsets") 
+        textPrintHelp.print(screen,
+            "'raw', '5k', and '2s', respectively. See the bundled config.txt file.")
+        textPrintHelp.print(screen, "")
+
+        textPrintHelp.print(screen,
+            "2. Choose the HITSTOP OFFSET setting based on if you want to practice HCL")
+        textPrintHelp.print(screen,
+            "6FRC6 timing 'raw' (with no hitstop, as if the HCL input was completed")
+        textPrintHelp.print(screen,
+            "after the hitstop of 5H ended), or when cancelled from a 5k or 2s on the")
+        textPrintHelp.print(screen,
+            "first possible frame.")
+        textPrintHelp.print(screen, "")
+
+        textPrintHelp.print(screen,
+            "3. After attempting an HCL 6FRC6, the 'inputs after HCL' shows the next")
+        textPrintHelp.print(screen,
+            "28 frames of inputs. Adjust and develop a feel for the timing with the")
+        textPrintHelp.print(screen,
+            "feedback provided.")
+        textPrintHelp.print(screen, "")
+
+        textPrintHelp.print(screen,
+            "* You can switch sides with whatever button you mapped to select/back.")
+        textPrintHelp.print(screen,
+            "* Due to Pygame limitations, detected inputs may be ≤ 2f early.")
+        textPrintHelp.print(screen,
+            "* You can find the full documentation and more at xxxxxxxxx ")
+        textPrintHelp.print(screen, "")
+
+        textPrintHelp.print(screen,
+            "Thank you @YoJimbo0321, @kurushii_drive, FGC@UCLA, the #i-no channel at the")
+        textPrintHelp.print(screen,
+            "GGXX+R discord, anyone using and improving this tool, and my fam & friends.")
+        textPrintHelp.print(screen, "")
+
+        textPrintHelp.print(screen,
+            "# " + version + ", by Zenryoku#2982 from FGC@UCLA.")
+
+        textPrintHelp.reset(newline_spacing=12)
+    """ Help display end"""
 
     #pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(0, surf_y_size-300, surf_x_size, 5))
 
